@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(raylib_artifact);
 
     const exe = b.addExecutable(.{
-        .name = "muzig",
+        .name = "tonnetz",
         .root_module = exe_mod,
     });
 

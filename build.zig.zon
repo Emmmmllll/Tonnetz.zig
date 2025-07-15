@@ -1,7 +1,7 @@
 .{
-    .name = .muZig,
+    .name = .tonnetz,
     .version = "0.0.0",
-    .fingerprint = 0xfda39b3c535f0d73, // Changing this has security and trust implications.
+    .fingerprint = 0x348df2ce16960400, // Changing this has security and trust implications.
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .raylib_zig = .{
