@@ -46,6 +46,7 @@ pub fn main() !void {
 
     while (!rl.windowShouldClose()) {
         app.handleInput();
+        try app.update_state();
         rl.beginDrawing();
         defer rl.endDrawing();
 

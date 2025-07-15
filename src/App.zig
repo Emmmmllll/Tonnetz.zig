@@ -27,6 +27,14 @@ key_map: [notes.Key.max + 1]struct { kb: rl.KeyboardKey, note: notes.Key, state:
 },
 audio: *Audio,
 current_wave: Audio.Wave = .sine,
+state: State = .{},
+
+const State = struct {
+    curr_wave_text_buf: [64]u8 = undefined,
+    volume_text_buf: [64]u8 = undefined,
+    curr_wave_label: Label = .{ .text = "Hi", .pos = .fromVals(4, 4), .fontsize = 16 },
+    volume_label: Label = .{ .text = "Test", .pos = .fromVals(4, 24), .fontsize = 16 },
+};
 
 pub fn deinit(self: *App) void {
     self.audio.deinit();
@@ -35,12 +43,7 @@ pub fn deinit(self: *App) void {
 pub fn handleInput(self: *App) void {
     const audio = self.audio;
     if (rl.isKeyPressed(.w)) {
-        self.current_wave = switch (self.current_wave) {
-            .sine => .square,
-            .square => .triangle,
-            .triangle => .sawtooth,
-            .sawtooth => .sine,
-        };
+        self.current_wave = next_wave(self.current_wave);
     }
 
     for (&self.key_map) |*key_pair| {
@@ -66,13 +69,18 @@ pub fn handleInput(self: *App) void {
         const now = std.time.milliTimestamp();
         const click_delay = now - self.last_click;
         self.last_click = now;
+        const last_clicked = self.last_clicked;
+        self.last_clicked = null;
 
         const mouse_pos = rl.getMousePosition();
-        const item = self.grid.clickedItem(mouse_pos) orelse {
-            self.last_clicked = null;
+        if (self.state.curr_wave_label.includesPos(.fromVec2(mouse_pos))) {
+            audio.lock();
+            defer audio.unlock();
+            self.current_wave = next_wave(self.current_wave);
             break :blk;
-        };
-        if (click_delay < self.double_click_delay and self.last_clicked != null and self.last_clicked.? == item.key) {
+        }
+        const item = self.grid.clickedItem(mouse_pos) orelse break :blk;
+        if (click_delay < self.double_click_delay and last_clicked != null and last_clicked.? == item.key) {
             audio.mutex.lock();
             defer audio.mutex.unlock();
             const is_pressed = item.is_pressed;
@@ -92,7 +100,6 @@ pub fn handleInput(self: *App) void {
                 audio.removeSound(item.key);
                 self.key_map[@intFromEnum(item.key)].state = .off;
             }
-            self.last_clicked = null;
         } else self.last_clicked = item.key;
     }
     if (rl.isMouseButtonPressed(.right)) blk: {
@@ -106,33 +113,36 @@ pub fn handleInput(self: *App) void {
             sound.waveform = self.current_wave;
         }
     }
+}
 
+pub fn draw(self: *App) void {
+    self.grid.draw();
+    self.state.curr_wave_label.draw();
+    self.state.volume_label.draw();
+}
+
+pub fn update_state(self: *App) !void {
+    const state = &self.state;
+    state.curr_wave_label.setFmtBufText(
+        &state.curr_wave_text_buf,
+        "Current wave: {s}",
+        .{@tagName(self.current_wave)},
+    ) catch unreachable;
+    state.volume_label.setFmtBufText(
+        &state.volume_text_buf,
+        "Volume: {}",
+        .{@as(u8, @intFromFloat(self.audio.volume * 100.0))},
+    ) catch unreachable;
     for (&self.grid.keys) |*item| {
         item.is_pressed = self.key_map[@intFromEnum(item.key)].state != .off;
     }
 }
 
-pub fn draw(self: *App) void {
-    self.grid.draw();
-    draw_current_wave(self.current_wave);
-    draw_volume(self.audio.volume);
-}
-
-fn draw_current_wave(current_wave: Audio.Wave) void {
-    var text_buf: [64]u8 = undefined;
-    Label.drawFmt("Current wave: {s}", .{@tagName(current_wave)}, .{
-        .strategy = .{ .buf = &text_buf },
-        .pos = .fromVals(4, 4),
-        .fontsize = 16,
-    }) catch unreachable;
-}
-
-fn draw_volume(volume: f32) void {
-    var text_buf: [64]u8 = undefined;
-    const intvolume: u8 = @intFromFloat(volume * 100.0);
-    Label.drawFmt("Volume: {}", .{intvolume}, .{
-        .strategy = .{ .buf = &text_buf },
-        .pos = .fromVals(4, 24),
-        .fontsize = 16,
-    }) catch unreachable;
+fn next_wave(wave: Audio.Wave) Audio.Wave {
+    return switch (wave) {
+        .sine => .square,
+        .square => .triangle,
+        .triangle => .sawtooth,
+        .sawtooth => .sine,
+    };
 }
