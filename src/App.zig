@@ -42,10 +42,49 @@ pub fn deinit(self: *App) void {
 
 pub fn handleInput(self: *App) void {
     const audio = self.audio;
-    if (rl.isKeyPressed(.w)) {
-        self.current_wave = next_wave(self.current_wave);
+    // Handle Keyboard input
+    if (rl.isKeyPressed(.w))
+        self.current_wave = next_wave(self.current_wave)
+    else
+        self.handle_note_keys();
+    // Handle Mouse input
+    if (rl.isMouseButtonPressed(.left)) {
+        const pos = rl.getMousePosition();
+        if (self.state.curr_wave_label.includesPos(.fromVec2(pos))) {
+            audio.lock();
+            defer audio.unlock();
+            self.current_wave = next_wave(self.current_wave);
+        } else if (self.handle_grid_left_click(pos)) {}
     }
+    if (rl.isMouseButtonPressed(.right)) {
+        const pos = rl.getMousePosition();
+        if (self.handle_grid_right_click(pos)) {}
+    }
+    const mouse_wheel = rl.getMouseWheelMoveV();
+    if (mouse_wheel.y != 0 or mouse_wheel.x != 0) {
+        const mouse_pos = rl.getMousePosition();
+        if (self.state.volume_label.includesPos(.fromVec2(mouse_pos))) {
+            audio.lock();
+            defer audio.unlock();
+            const volume_change = @as(f32, mouse_wheel.y) * 0.1;
+            audio.volume = std.math.clamp(audio.volume + volume_change, 0.0, 1.0);
+        } else if (self.state.curr_wave_label.includesPos(.fromVec2(mouse_pos))) {
+            if (mouse_wheel.y < 0) {
+                self.current_wave = next_wave(self.current_wave);
+            } else if (mouse_wheel.y > 0) {
+                self.current_wave = switch (self.current_wave) {
+                    .sine => .sawtooth,
+                    .sawtooth => .triangle,
+                    .triangle => .square,
+                    .square => .sine,
+                };
+            }
+        }
+    }
+}
 
+fn handle_note_keys(self: *App) void {
+    const audio = self.audio;
     for (&self.key_map) |*key_pair| {
         if (key_pair.state == .toggle) continue;
         const is_down = rl.isKeyDown(key_pair.kb);
@@ -64,55 +103,51 @@ pub fn handleInput(self: *App) void {
             } else audio.removeSound(key_pair.note);
         }
     }
+}
 
-    if (rl.isMouseButtonPressed(.left)) blk: {
-        const now = std.time.milliTimestamp();
-        const click_delay = now - self.last_click;
-        self.last_click = now;
-        const last_clicked = self.last_clicked;
-        self.last_clicked = null;
+fn handle_grid_left_click(self: *App, pos: rl.Vector2) bool {
+    const audio = self.audio;
+    const now = std.time.milliTimestamp();
+    const click_delay = now - self.last_click;
+    self.last_click = now;
+    const last_clicked = self.last_clicked;
+    self.last_clicked = null;
 
-        const mouse_pos = rl.getMousePosition();
-        if (self.state.curr_wave_label.includesPos(.fromVec2(mouse_pos))) {
-            audio.lock();
-            defer audio.unlock();
-            self.current_wave = next_wave(self.current_wave);
-            break :blk;
-        }
-        const item = self.grid.clickedItem(mouse_pos) orelse break :blk;
-        if (click_delay < self.double_click_delay and last_clicked != null and last_clicked.? == item.key) {
-            audio.mutex.lock();
-            defer audio.mutex.unlock();
-            const is_pressed = item.is_pressed;
-            item.is_pressed = !is_pressed;
+    const item = self.grid.clickedItem(pos) orelse return false;
+    if (click_delay < self.double_click_delay and last_clicked != null and last_clicked.? == item.key) {
+        audio.mutex.lock();
+        defer audio.mutex.unlock();
+        const is_pressed = item.is_pressed;
+        item.is_pressed = !is_pressed;
 
-            if (!is_pressed) {
-                if (audio.addOrModifySound(item.key, .{
-                    .frequency = item.key.to_frequency(item.octave),
-                    .waveform = self.current_wave,
-                })) |sound| {
-                    sound.fade = .fade_in;
-                    sound.frequency = item.key.to_frequency(item.octave);
-                    sound.waveform = self.current_wave;
-                }
-                self.key_map[@intFromEnum(item.key)].state = .toggle;
-            } else {
-                audio.removeSound(item.key);
-                self.key_map[@intFromEnum(item.key)].state = .off;
+        if (!is_pressed) {
+            if (audio.addOrModifySound(item.key, .{
+                .frequency = item.key.to_frequency(item.octave),
+                .waveform = self.current_wave,
+            })) |sound| {
+                sound.fade = .fade_in;
+                sound.frequency = item.key.to_frequency(item.octave);
+                sound.waveform = self.current_wave;
             }
-        } else self.last_clicked = item.key;
-    }
-    if (rl.isMouseButtonPressed(.right)) blk: {
-        const mouse_pos = rl.getMousePosition();
-        const item = self.grid.clickedItem(mouse_pos) orelse break :blk;
-        audio.lock();
-        defer audio.unlock();
-        if (item.octave < 3) item.octave += 1 else item.octave = -2;
-        if (audio.modifySound(item.key)) |sound| {
-            sound.frequency = item.key.to_frequency(item.octave);
-            sound.waveform = self.current_wave;
+            self.key_map[@intFromEnum(item.key)].state = .toggle;
+        } else {
+            audio.removeSound(item.key);
+            self.key_map[@intFromEnum(item.key)].state = .off;
         }
+    } else self.last_clicked = item.key;
+    return true;
+}
+
+fn handle_grid_right_click(self: *App, pos: rl.Vector2) bool {
+    const item = self.grid.clickedItem(pos) orelse return false;
+    self.audio.lock();
+    defer self.audio.unlock();
+    if (item.octave < 3) item.octave += 1 else item.octave = -2;
+    if (self.audio.modifySound(item.key)) |sound| {
+        sound.frequency = item.key.to_frequency(item.octave);
+        sound.waveform = self.current_wave;
     }
+    return true;
 }
 
 pub fn draw(self: *App) void {
