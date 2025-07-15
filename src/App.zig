@@ -3,6 +3,7 @@ const rl = @import("raylib");
 const notes = @import("notes.zig");
 const TonnetzGrid = @import("TonnetzGrid.zig");
 const Audio = @import("Audio.zig");
+const Label = @import("ui/Label.zig");
 
 const App = @This();
 
@@ -119,13 +120,19 @@ pub fn draw(self: *App) void {
 
 fn draw_current_wave(current_wave: Audio.Wave) void {
     var text_buf: [64]u8 = undefined;
-    const text = std.fmt.bufPrintZ(&text_buf, "Current wave: {s}", .{@tagName(current_wave)}) catch @panic("Unexpected: Format failed");
-    rl.drawText(text, 4, 4, 16, .black);
+    Label.drawFmt("Current wave: {s}", .{@tagName(current_wave)}, .{
+        .strategy = .{ .buf = &text_buf },
+        .pos = .fromVals(4, 4),
+        .fontsize = 16,
+    }) catch unreachable;
 }
 
 fn draw_volume(volume: f32) void {
     var text_buf: [64]u8 = undefined;
     const intvolume: u8 = @intFromFloat(volume * 100.0);
-    const text = std.fmt.bufPrintZ(&text_buf, "Volume: {}", .{intvolume}) catch @panic("Unexpected: Format failed");
-    rl.drawText(text, 4, 24, 16, .black);
+    Label.drawFmt("Volume: {}", .{intvolume}, .{
+        .strategy = .{ .buf = &text_buf },
+        .pos = .fromVals(4, 24),
+        .fontsize = 16,
+    }) catch unreachable;
 }

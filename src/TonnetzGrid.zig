@@ -2,6 +2,7 @@ const std = @import("std");
 const notes = @import("notes.zig");
 const Grid = @This();
 const rl = @import("raylib");
+const Label = @import("ui/Label.zig");
 
 const Key = notes.Key;
 
@@ -194,14 +195,14 @@ fn draw_circle(self: *const Grid, circle: Item) void {
         if (circle.is_pressed) style.color_map.get(circle.key) else .light_gray,
     );
     var text_buf: [8]u8 = undefined;
-    const text = std.fmt.bufPrintZ(&text_buf, "{s} {}", .{ @tagName(circle.key), circle.octave }) catch @panic("Unexpected: Format failed");
-    const font_size: u32 = iradius / 2;
-    const text_w: u32 = @intCast(rl.measureText(text, @intCast(font_size)));
-    rl.drawText(
-        text,
-        @intCast(x -| (text_w / 2)),
-        @intCast(y -| (font_size / 2)),
-        @intCast(font_size),
-        .black,
-    );
+    var label = Label.initFmt("{s} {}", .{ @tagName(circle.key), circle.octave }, .{
+        .strategy = .{ .buf = &text_buf },
+        .pos = .fromVals(x, y),
+        .fontsize = @floatFromInt(iradius / 2),
+    }) catch unreachable;
+    // Center the label in the circle
+    const size = label.measureSize();
+    label.pos.x -= size.x / 2;
+    label.pos.y -= size.y / 2;
+    label.draw();
 }
