@@ -36,13 +36,13 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const run_step = b.step("run", "Run the muzic executable");
+    const run_step = b.step("run", "Run the executable");
     const run_cmd = b.addRunArtifact(exe);
     run_step.dependOn(&run_cmd.step);
 
     if (b.args) |args| run_cmd.addArgs(args);
 
-    const test_step = b.step("test", "Run the muzic tests");
+    const test_step = b.step("test", "Run the tests");
     const exe_test = b.addTest(.{
         .root_module = exe_mod,
     });
