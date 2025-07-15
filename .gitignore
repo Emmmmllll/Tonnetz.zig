@@ -1,3 +1,7 @@
+# Zig build artifacts
 .zig-cache
-.vs
 zig-out
+
+# Editor config
+.vscode
+.vs
