@@ -15,7 +15,7 @@ pub fn main() !void {
         .h = 450,
     };
 
-    rl.initWindow(dimensions.w, dimensions.h, "test window");
+    rl.initWindow(dimensions.w, dimensions.h, "Tonnetz");
     defer rl.closeWindow();
 
     rl.initAudioDevice();
