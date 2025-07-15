@@ -8,7 +8,7 @@ const App = @This();
 
 last_click: i64 = 0,
 last_clicked: ?notes.Key = null,
-double_click_delay: i64 = 500,
+double_click_delay: i64 = 300,
 grid: TonnetzGrid,
 key_map: [notes.Key.max + 1]struct { kb: rl.KeyboardKey, note: notes.Key, state: enum { off, kb, toggle } = .off } = .{
     .{ .kb = .z, .note = .c },
